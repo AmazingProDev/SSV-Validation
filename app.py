@@ -4,6 +4,7 @@ import shutil
 import zipfile
 import uuid
 import traceback
+import base64
 import cv2
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -1125,11 +1126,27 @@ def upload():
                 _draw_badge(img_tmp, btext, bcol, force_scale=w_img / 600.0)
                 cv2.imwrite(p, img_tmp)
 
-    # Strip private keys before serialising to JSON
+    # Convert images to base64 (works reliably on Vercel without persistent /tmp)
     for e in all_entries:
-        e.pop('_analyzed_path', None)
-        e.pop('_badge_text',    None)
-        e.pop('_badge_color',   None)
+        orig_path = e.get('original')
+        anal_path = e.get('analyzed')
+
+        # Encode original image
+        if orig_path and os.path.exists(orig_path):
+            with open(orig_path, 'rb') as f:
+                e['original_b64'] = base64.b64encode(f.read()).decode('utf-8')
+
+        # Encode analyzed image
+        if anal_path and os.path.exists(anal_path):
+            with open(anal_path, 'rb') as f:
+                e['analyzed_b64'] = base64.b64encode(f.read()).decode('utf-8')
+
+        # Remove file paths and private keys
+        e.pop('original',        None)
+        e.pop('analyzed',        None)
+        e.pop('_analyzed_path',  None)
+        e.pop('_badge_text',     None)
+        e.pop('_badge_color',    None)
 
     return jsonify({
         'filename':   filename,

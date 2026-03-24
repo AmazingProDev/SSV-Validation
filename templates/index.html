@@ -647,24 +647,26 @@ function buildImageCard(img) {
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-left:12px;">
       ${buildResultBadge(img.result)}
-      <a class="dl-btn" href="${img.analyzed}" download title="Download analyzed image">
+      <span class="dl-btn" title="Right-click to save image">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
         </svg>
-      </a>
+      </span>
     </div>`;
   card.appendChild(header);
 
   const compare = document.createElement('div');
   compare.className = 'img-compare';
+  const origSrc = img.original_b64 ? `data:image/png;base64,${img.original_b64}` : img.original;
+  const analSrc = img.analyzed_b64 ? `data:image/png;base64,${img.analyzed_b64}` : img.analyzed;
   compare.innerHTML = `
     <div class="img-panel">
       <div class="img-panel-label">Original</div>
-      <img src="${img.original}" loading="lazy" onclick="openLB('${img.original}')">
+      <img src="${origSrc}" loading="lazy" onclick="openLB('${origSrc.replace(/'/g, "\\'")}')">
     </div>
     <div class="img-panel">
       <div class="img-panel-label">Analyzed</div>
-      <img src="${img.analyzed}" loading="lazy" onclick="openLB('${img.analyzed}')">
+      <img src="${analSrc}" loading="lazy" onclick="openLB('${analSrc.replace(/'/g, "\\'")}')">
     </div>`;
   card.appendChild(compare);
   return card;
