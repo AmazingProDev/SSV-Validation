@@ -647,11 +647,12 @@ function buildImageCard(img) {
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-left:12px;">
       ${buildResultBadge(img.result)}
-      <span class="dl-btn" title="Right-click to save image">
+      <a class="dl-btn" href="${img.analyzed || ''}" download="${escHtml(img.label||'analyzed')}.png"
+         title="Download analyzed image" style="${img.analyzed ? '' : 'pointer-events:none;opacity:.4'}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
         </svg>
-      </span>
+      </a>
     </div>`;
   card.appendChild(header);
 

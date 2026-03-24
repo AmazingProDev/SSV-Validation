@@ -5,6 +5,7 @@ import zipfile
 import uuid
 import traceback
 import base64
+import requests as _requests
 import cv2
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -16,11 +17,33 @@ app = Flask(__name__)
 
 # Vercel's filesystem is read-only except /tmp.
 # VERCEL env var is set automatically by the Vercel runtime.
-_UPLOAD_ROOT = '/tmp' if os.environ.get('VERCEL') else os.path.dirname(os.path.abspath(__file__))
+_UPLOAD_ROOT  = '/tmp' if os.environ.get('VERCEL') else os.path.dirname(os.path.abspath(__file__))
+_BLOB_TOKEN   = os.environ.get('BLOB_READ_WRITE_TOKEN')   # set by `vercel env pull`
+_USE_BLOB     = bool(_BLOB_TOKEN)
+
 app.config['UPLOAD_FOLDER'] = os.path.join(_UPLOAD_ROOT, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+
+def _blob_upload(local_path, session_id, filename):
+    """Upload a file to Vercel Blob and return its public CDN URL."""
+    pathname = f'ssv/{session_id}/{filename}'
+    with open(local_path, 'rb') as fh:
+        resp = _requests.put(
+            f'https://blob.vercel-storage.com/{pathname}',
+            headers={
+                'Authorization':     f'Bearer {_BLOB_TOKEN}',
+                'x-content-type':    'image/png',
+                'x-add-random-suffix': 'false',
+            },
+            data=fh,
+            timeout=30,
+        )
+    resp.raise_for_status()
+    return resp.json()['url']
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Cross-check algorithm constants  (mirrored from analyzer.py)
@@ -1126,27 +1149,43 @@ def upload():
                 _draw_badge(img_tmp, btext, bcol, force_scale=w_img / 600.0)
                 cv2.imwrite(p, img_tmp)
 
-    # Convert images to base64 (works reliably on Vercel without persistent /tmp)
+    # ── Pass 3: expose images — Blob URLs (Vercel) or base64 (local/fallback) ──
     for e in all_entries:
-        orig_path = e.get('original')
-        anal_path = e.get('analyzed')
+        orig_local = e.get('original')   # local /tmp path
+        anal_local = e.get('analyzed')
 
-        # Encode original image
-        if orig_path and os.path.exists(orig_path):
-            with open(orig_path, 'rb') as f:
-                e['original_b64'] = base64.b64encode(f.read()).decode('utf-8')
+        if _USE_BLOB:
+            # Upload both images to Vercel Blob → permanent CDN URLs
+            try:
+                fname = e.get('filename', 'image.png')
+                if orig_local and os.path.exists(orig_local):
+                    e['original'] = _blob_upload(orig_local, session_id, fname)
+                if anal_local and os.path.exists(anal_local):
+                    e['analyzed'] = _blob_upload(
+                        anal_local, session_id,
+                        fname.replace('.png', '_analyzed.png'))
+            except Exception as blob_err:
+                print(f'[BLOB] upload failed: {blob_err} — falling back to base64')
+                _USE_BLOB_this = False
+            else:
+                _USE_BLOB_this = True
+        else:
+            _USE_BLOB_this = False
 
-        # Encode analyzed image
-        if anal_path and os.path.exists(anal_path):
-            with open(anal_path, 'rb') as f:
-                e['analyzed_b64'] = base64.b64encode(f.read()).decode('utf-8')
+        if not _USE_BLOB_this:
+            # Base64 fallback (local dev or if Blob upload failed)
+            if orig_local and os.path.exists(orig_local):
+                with open(orig_local, 'rb') as fh:
+                    e['original_b64'] = base64.b64encode(fh.read()).decode()
+                e.pop('original', None)
+            if anal_local and os.path.exists(anal_local):
+                with open(anal_local, 'rb') as fh:
+                    e['analyzed_b64'] = base64.b64encode(fh.read()).decode()
+                e.pop('analyzed', None)
 
-        # Remove file paths and private keys
-        e.pop('original',        None)
-        e.pop('analyzed',        None)
-        e.pop('_analyzed_path',  None)
-        e.pop('_badge_text',     None)
-        e.pop('_badge_color',    None)
+        e.pop('_analyzed_path', None)
+        e.pop('_badge_text',    None)
+        e.pop('_badge_color',   None)
 
     return jsonify({
         'filename':   filename,
