@@ -394,8 +394,8 @@ function hasDegradation(img) {
   return false;
 }
 
-/** Returns true for image types we want to display (hide geo). */
-function shouldShow(img) { return img.type !== 'geo'; }
+/** Returns true for image types we want to display (hide geo and unclassified). */
+function shouldShow(img) { return img.type !== 'geo' && img.type !== 'unknown'; }
 
 // Display order: serving_cell → coverage → quality → DL → UL (geo hidden)
 const TYPE_ORDER = ['serving_cell', 'coverage', 'quality', 'dl_throughput', 'ul_throughput', 'unknown'];
