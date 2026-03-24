@@ -496,8 +496,11 @@ def detect_cross(image_path, output_path):
     _diag   = math.sqrt(w * w + h * h)
     _sc     = max(0.5, min(5.0, _diag / 1000.0))
 
-    S_WIN_R  = max(8,   round(_SITE_WIN_R   * _sc))   # site density window
-    S_DW     = _SITE_DW / max(1.0, _sc)               # weaker distance penalty on large images
+    # Site density window: cap at 24 to avoid over-smoothing the peak on large images
+    # (large windows lose fine detail of the actual site center)
+    S_WIN_R  = max(8, min(24, round(_SITE_WIN_R * _sc)))
+    # Keep prior penalty proportional to image size (don't weaken it on large images)
+    S_DW     = _SITE_DW
     FAN_IN   = max(4,   round(_FAN_INNER    * _sc))
     FAN_OUT  = max(20,  round(_FAN_OUTER    * _sc))
     FAN_TGT  = max(8,   round(_FAN_TARGET   * _sc))
