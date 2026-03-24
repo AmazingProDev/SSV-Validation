@@ -782,9 +782,12 @@ def detect_cross(image_path, output_path):
         intrusions.append(outside / len(angles) if angles else 0.0)
     max_intrusion = max(intrusions)
 
-    cross = (misassigned  >= _MISASSIGN_THR or
+    cross = (misassigned   >= _MISASSIGN_THR or
              mixed_bin    >= _MIXED_THR     or
-             max_intrusion >= _INTRUSION_THR)
+             max_intrusion >= _INTRUSION_THR or
+             # All three metrics collectively elevated → cross even if each is
+             # individually below its threshold (e.g. 0.13 + 0.178 + 0.179 = 0.487)
+             (misassigned + mixed_bin + max_intrusion) >= 0.40)
 
     # ── 6. Annotate output image ───────────────────────────────────────────
     output = img.copy()
