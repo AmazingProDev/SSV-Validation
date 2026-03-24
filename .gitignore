@@ -10,3 +10,5 @@ test_output/
 *.egg-info/
 .env
 .DS_Store
+.vercel
+.env*.local
