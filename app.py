@@ -1020,8 +1020,9 @@ def analyze_image(img_info, session_dir, session_id):
         'original':   f'/uploads/{session_id}/{img_info["filename"]}',
         'analyzed':   f'/uploads/{session_id}/{out_filename}',
         'result':     {},
-        # Private fields stripped before returning JSON; used for badge second pass
-        '_analyzed_path': out_path,
+        # Private fields stripped before returning JSON; used for badge/image pass
+        '_orig_path':     src_path,   # actual local filesystem path for original
+        '_analyzed_path': out_path,   # actual local filesystem path for analyzed
         '_badge_text':    None,
         '_badge_color':   None,
     }
@@ -1151,8 +1152,11 @@ def upload():
 
     # ── Pass 3: expose images — Blob URLs (Vercel) or base64 (local/fallback) ──
     for e in all_entries:
-        orig_local = e.get('original')   # local /tmp path
-        anal_local = e.get('analyzed')
+        # Use the actual filesystem paths stored during analysis
+        orig_local = e.pop('_orig_path',     None)
+        anal_local = e.pop('_analyzed_path', None)
+        e.pop('_badge_text',  None)
+        e.pop('_badge_color', None)
 
         if _USE_BLOB:
             # Upload both images to Vercel Blob → permanent CDN URLs
@@ -1164,15 +1168,14 @@ def upload():
                     e['analyzed'] = _blob_upload(
                         anal_local, session_id,
                         fname.replace('.png', '_analyzed.png'))
+                use_blob = True
             except Exception as blob_err:
                 print(f'[BLOB] upload failed: {blob_err} — falling back to base64')
-                _USE_BLOB_this = False
-            else:
-                _USE_BLOB_this = True
+                use_blob = False
         else:
-            _USE_BLOB_this = False
+            use_blob = False
 
-        if not _USE_BLOB_this:
+        if not use_blob:
             # Base64 fallback (local dev or if Blob upload failed)
             if orig_local and os.path.exists(orig_local):
                 with open(orig_local, 'rb') as fh:
@@ -1182,10 +1185,6 @@ def upload():
                 with open(anal_local, 'rb') as fh:
                     e['analyzed_b64'] = base64.b64encode(fh.read()).decode()
                 e.pop('analyzed', None)
-
-        e.pop('_analyzed_path', None)
-        e.pop('_badge_text',    None)
-        e.pop('_badge_color',   None)
 
     return jsonify({
         'filename':   filename,
