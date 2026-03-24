@@ -1,0 +1,9 @@
+uploads/
+__pycache__/
+*.pyc
+*.pyo
+*.xlsx
+extracted_images/
+extracted_images2/
+test_output/
+.claude/
