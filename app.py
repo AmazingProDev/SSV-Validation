@@ -636,8 +636,15 @@ def detect_cross(image_path, output_path):
         prototypes.append(tuple(int(round(v)) for v in samples.mean(axis=0)))
 
     # ── 4. Assign drive-test dots to sectors ───────────────────────────────
+    # Scale density thresholds with the window area so that drive-test dots
+    # (which grow ~_sc^2 in pixel area on large images) are not falsely rejected.
+    # base window area = (2*_PNT_WIN_R+1)^2 = 7^2 = 49
+    _pnt_area_ratio = float((2 * PNT_WR + 1) ** 2) / float((2 * _PNT_WIN_R + 1) ** 2)
+    PNT_MIN_D_s = max(1, round(_PNT_MIN_D * _pnt_area_ratio))
+    PNT_MAX_D_s = round(_PNT_MAX_D * _pnt_area_ratio)
+
     pt_mask = (colorful == 1) & \
-              (den_p >= _PNT_MIN_D) & (den_p <= _PNT_MAX_D) & \
+              (den_p >= PNT_MIN_D_s) & (den_p <= PNT_MAX_D_s) & \
               (r_all >= PNT_MR)
     pt_ys, pt_xs = np.where(pt_mask)
 
@@ -673,11 +680,11 @@ def detect_cross(image_path, output_path):
                      (rgb_dists[:,    si] <= rgb_thrs[si])
 
     # ── Connected-component filtering: keep only point-like blobs ─────────────
-    # Mirrors is_point_like_component() from analyzer.py:
-    #   area 5–90 px, bounding-box span ≤ 14 px on each axis, fill ≥ 0.20
+    # Scale limits with image resolution so genuine dot clusters in high-res
+    # images are not incorrectly filtered out (base values for _sc=1.0)
     _COMP_MIN_PX   = 5
-    _COMP_MAX_PX   = 90
-    _COMP_MAX_SPAN = 14
+    _COMP_MAX_PX   = max(90,  round(90  * _sc))   # e.g. 252 at _sc=2.8
+    _COMP_MAX_SPAN = max(14,  round(14  * _sc))   # e.g. 39  at _sc=2.8
     _COMP_MIN_FILL = 0.20
 
     point_angles = []
